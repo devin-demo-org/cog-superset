@@ -125,6 +125,23 @@ _RLSCacheKey = tuple[str, int | str]
 _RLSCache = dict[_RLSCacheKey, list[SqlaQuery]]
 
 
+def _mask_email(email: Optional[str]) -> Optional[str]:
+    """Redact the local part of an email address for GDPR Art.5 / Art.25.
+
+    Produces ``a***@example.com``, which keeps enough signal for audit
+    triage without persisting the full address into audit logs. The input
+    is returned unchanged when it is falsy, and ``"***"`` is returned when
+    it is not a parseable ``local@domain`` pair.
+    """
+    if not email:
+        return email
+    local, sep, domain = email.partition("@")
+    if not sep or not domain:
+        return "***"
+    masked_local = local[0] + "***" if local else "*"
+    return f"{masked_local}@{domain}"
+
+
 def _log_audit_event(action: str, payload: dict[str, Any]) -> None:
     """Log an audit event via the configured event logger.
 
@@ -233,7 +250,7 @@ class SupersetUserApi(UserApi):
             {
                 "target_username": item.username,
                 "target_user_id": item.id,
-                "email": item.email,
+                "email": _mask_email(item.email),
             },
         )
 
@@ -243,7 +260,7 @@ class SupersetUserApi(UserApi):
             {
                 "target_username": item.username,
                 "target_user_id": item.id,
-                "email": item.email,
+                "email": _mask_email(item.email),
                 "active": item.active,
             },
         )

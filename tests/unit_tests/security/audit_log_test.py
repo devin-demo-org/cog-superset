@@ -17,15 +17,34 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from flask_appbuilder.security.sqla.models import Group, Role, User
 
 from superset.security.manager import (
     _log_audit_event,
+    _mask_email,
     SupersetGroupApi,
     SupersetRoleApi,
     SupersetSecurityManager,
     SupersetUserApi,
 )
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("alice@example.com", "a***@example.com"),
+        ("a@b.co", "a***@b.co"),
+        ("j@example.com", "j***@example.com"),
+        ("@example.com", "*@example.com"),
+        ("not-an-email", "***"),
+        ("", ""),
+        (None, None),
+    ],
+)
+def test_mask_email(raw: str | None, expected: str | None) -> None:
+    """_mask_email redacts the local part without exposing full PII."""
+    assert _mask_email(raw) == expected
 
 
 @patch("superset.extensions.event_logger")
@@ -121,7 +140,7 @@ def test_user_api_post_add_logs_event(mock_log: MagicMock) -> None:
         {
             "target_username": "testuser",
             "target_user_id": 7,
-            "email": "test@example.com",
+            "email": "t***@example.com",
         },
     )
 
@@ -141,7 +160,7 @@ def test_user_api_post_update_logs_event(mock_log: MagicMock) -> None:
         {
             "target_username": "testuser",
             "target_user_id": 7,
-            "email": "test@example.com",
+            "email": "t***@example.com",
             "active": True,
         },
     )
