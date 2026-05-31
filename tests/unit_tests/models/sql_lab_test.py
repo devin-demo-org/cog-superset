@@ -133,3 +133,28 @@ def test_sql_tables_mixin_invalid_sql_returns_empty_list(
         else klass(database=MagicMock())
     )
     assert instance.sql_tables == []
+
+
+@pytest.mark.parametrize(
+    ("email", "expected"),
+    [
+        ("admin@example.com", "a***@example.com"),
+        ("j@example.com", "j***@example.com"),
+        ("a@b.co", "a***@b.co"),
+        ("x", "***"),
+        ("", "***"),
+        ("noatsign", "***"),
+    ],
+)
+def test_saved_query_mask_email(email: str, expected: str) -> None:
+    """GDPR Art.5: user_email must be masked to avoid exposing PII in logs."""
+    assert SavedQuery._mask_email(email) == expected
+
+
+def test_saved_query_user_email_property_masks_pii() -> None:
+    """GDPR Art.5: the user_email property returns a masked value."""
+    mock_user = MagicMock()
+    mock_user.email = "alice@example.com"
+    query = SavedQuery(database=MagicMock())
+    query.user = mock_user
+    assert query.user_email == "a***@example.com"

@@ -519,9 +519,22 @@ class SavedQuery(
         """
         )
 
+    @staticmethod
+    def _mask_email(email: str) -> str:
+        """Mask the local part of an email address to comply with GDPR Art.5."""
+        parts = email.split("@")
+        if len(parts) != 2:
+            return "***"
+        local, domain = parts
+        if len(local) <= 1:
+            masked_local = "*"
+        else:
+            masked_local = local[0] + "***"
+        return f"{masked_local}@{domain}"
+
     @property
     def user_email(self) -> str:
-        return self.user.email
+        return self._mask_email(self.user.email)
 
     @property
     def sqlalchemy_uri(self) -> URL:
