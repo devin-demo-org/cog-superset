@@ -233,7 +233,6 @@ class SupersetUserApi(UserApi):
             {
                 "target_username": item.username,
                 "target_user_id": item.id,
-                "email": item.email,
             },
         )
 
@@ -243,7 +242,6 @@ class SupersetUserApi(UserApi):
             {
                 "target_username": item.username,
                 "target_user_id": item.id,
-                "email": item.email,
                 "active": item.active,
             },
         )

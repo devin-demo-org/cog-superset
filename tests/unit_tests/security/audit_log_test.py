@@ -109,7 +109,7 @@ def test_role_api_post_delete_logs_event(mock_log: MagicMock) -> None:
 
 @patch("superset.security.manager._log_audit_event")
 def test_user_api_post_add_logs_event(mock_log: MagicMock) -> None:
-    """SupersetUserApi.post_add logs a UserCreated event."""
+    """SupersetUserApi.post_add logs a UserCreated event without PII."""
     api = SupersetUserApi.__new__(SupersetUserApi)
     user = MagicMock(spec=User)
     user.username = "testuser"
@@ -121,14 +121,13 @@ def test_user_api_post_add_logs_event(mock_log: MagicMock) -> None:
         {
             "target_username": "testuser",
             "target_user_id": 7,
-            "email": "test@example.com",
         },
     )
 
 
 @patch("superset.security.manager._log_audit_event")
 def test_user_api_post_update_logs_event(mock_log: MagicMock) -> None:
-    """SupersetUserApi.post_update logs a UserUpdated event."""
+    """SupersetUserApi.post_update logs a UserUpdated event without PII."""
     api = SupersetUserApi.__new__(SupersetUserApi)
     user = MagicMock(spec=User)
     user.username = "testuser"
@@ -141,7 +140,6 @@ def test_user_api_post_update_logs_event(mock_log: MagicMock) -> None:
         {
             "target_username": "testuser",
             "target_user_id": 7,
-            "email": "test@example.com",
             "active": True,
         },
     )
@@ -159,6 +157,33 @@ def test_user_api_post_delete_logs_event(mock_log: MagicMock) -> None:
         "UserDeleted",
         {"target_username": "testuser", "target_user_id": 7},
     )
+
+
+@patch("superset.security.manager._log_audit_event")
+def test_user_api_post_add_excludes_email(mock_log: MagicMock) -> None:
+    """GDPR Art.5: post_add must not include email in the audit payload."""
+    api = SupersetUserApi.__new__(SupersetUserApi)
+    user = MagicMock(spec=User)
+    user.username = "testuser"
+    user.id = 7
+    user.email = "test@example.com"
+    api.post_add(user)
+    payload = mock_log.call_args[0][1]
+    assert "email" not in payload
+
+
+@patch("superset.security.manager._log_audit_event")
+def test_user_api_post_update_excludes_email(mock_log: MagicMock) -> None:
+    """GDPR Art.5: post_update must not include email in the audit payload."""
+    api = SupersetUserApi.__new__(SupersetUserApi)
+    user = MagicMock(spec=User)
+    user.username = "testuser"
+    user.id = 7
+    user.email = "test@example.com"
+    user.active = True
+    api.post_update(user)
+    payload = mock_log.call_args[0][1]
+    assert "email" not in payload
 
 
 # --- Group CRUD ---
