@@ -89,7 +89,11 @@ const config: ControlPanelConfig = {
               label: t('Whisker/outlier options'),
               default: 'Tukey',
               description: t(
-                'Determines how whiskers and outliers are calculated.',
+                'Determines how whiskers and outliers are calculated. ' +
+                  'Tukey: Uses Q1 − 1.5×IQR / Q3 + 1.5×IQR thresholds (assumes roughly normal distribution). ' +
+                  'Min/max: Whiskers span dataset range; no outlier detection. ' +
+                  'Percentiles: Whisker bounds at specified percentiles; points outside are outliers. ' +
+                  'Algorithmic classification per EU AI Act Art. 13.',
               ),
               choices: [
                 ['Tukey', t('Tukey')],

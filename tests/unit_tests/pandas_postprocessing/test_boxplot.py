@@ -39,6 +39,10 @@ def test_boxplot_tukey():
         "cars__min",
         "cars__count",
         "cars__outliers",
+        "cars__whisker_method",
+        "cars__whisker_description",
+        "cars__lower_bound",
+        "cars__upper_bound",
         "region",
     }
     assert len(df) == 4
@@ -61,6 +65,10 @@ def test_boxplot_min_max():
         "cars__min",
         "cars__count",
         "cars__outliers",
+        "cars__whisker_method",
+        "cars__whisker_description",
+        "cars__lower_bound",
+        "cars__upper_bound",
         "region",
     }
     assert len(df) == 4
@@ -84,6 +92,10 @@ def test_boxplot_percentile():
         "cars__min",
         "cars__count",
         "cars__outliers",
+        "cars__whisker_method",
+        "cars__whisker_description",
+        "cars__lower_bound",
+        "cars__upper_bound",
         "region",
     }
     assert len(df) == 4
@@ -126,6 +138,58 @@ def test_boxplot_percentile_incorrect_params():
         )
 
 
+def test_boxplot_tukey_transparency_metadata():
+    df = boxplot(
+        df=names_df,
+        groupby=["region"],
+        whisker_type=PostProcessingBoxplotWhiskerType.TUKEY,
+        metrics=["cars"],
+    )
+    assert "cars__whisker_method" in df.columns
+    assert "cars__whisker_description" in df.columns
+    assert "cars__lower_bound" in df.columns
+    assert "cars__upper_bound" in df.columns
+
+    assert (df["cars__whisker_method"] == "Tukey IQR").all()
+    assert (
+        df["cars__whisker_description"].iloc[0].startswith("Outliers are points beyond")
+    )
+
+    for _, row in df.iterrows():
+        q1 = row["cars__q1"]
+        q3 = row["cars__q3"]
+        iqr = q3 - q1
+        assert row["cars__lower_bound"] == pytest.approx(q1 - 1.5 * iqr)
+        assert row["cars__upper_bound"] == pytest.approx(q3 + 1.5 * iqr)
+
+
+def test_boxplot_percentile_transparency_metadata():
+    df = boxplot(
+        df=names_df,
+        groupby=["region"],
+        whisker_type=PostProcessingBoxplotWhiskerType.PERCENTILE,
+        metrics=["cars"],
+        percentiles=[2, 98],
+    )
+    assert "cars__whisker_method" in df.columns
+    assert (df["cars__whisker_method"] == "Percentile").all()
+    assert "cars__lower_bound" in df.columns
+    assert "cars__upper_bound" in df.columns
+
+
+def test_boxplot_minmax_transparency_metadata():
+    df = boxplot(
+        df=names_df,
+        groupby=["region"],
+        whisker_type=PostProcessingBoxplotWhiskerType.MINMAX,
+        metrics=["cars"],
+    )
+    assert "cars__whisker_method" in df.columns
+    assert (df["cars__whisker_method"] == "Min/Max").all()
+    assert "cars__whisker_description" in df.columns
+    assert "No outlier detection" in df["cars__whisker_description"].iloc[0]
+
+
 def test_boxplot_type_coercion():
     df = names_df
     df["cars"] = df["cars"].astype(str)
@@ -146,6 +210,10 @@ def test_boxplot_type_coercion():
         "cars__min",
         "cars__count",
         "cars__outliers",
+        "cars__whisker_method",
+        "cars__whisker_description",
+        "cars__lower_bound",
+        "cars__upper_bound",
         "region",
     }
     assert len(df) == 4

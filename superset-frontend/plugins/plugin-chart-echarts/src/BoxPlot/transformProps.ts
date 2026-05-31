@@ -74,6 +74,7 @@ export default function transformProps(
     yAxisTitlePosition,
     sliceId,
     zoomable,
+    whiskerOptions = 'Tukey',
   } = formData as BoxPlotQueryFormData;
   const refs: Refs = {};
   const colorFn = CategoricalColorNamespace.getScale(colorScheme as string);
@@ -133,21 +134,47 @@ export default function transformProps(
             : `${groupbyLabel}, ${metric}`;
         // Outlier data is a nested array of numbers (uncommon, therefore no need to add to DataRecordValue)
         const outlierDatum = (datum[`${metric}__outliers`] || []) as number[];
+        const lowerBound = datum[`${metric}__lower_bound`] as
+          | number
+          | undefined;
+        const upperBound = datum[`${metric}__upper_bound`] as
+          | number
+          | undefined;
+        const whiskerMethod = (datum[`${metric}__whisker_method`] ||
+          whiskerOptions) as string;
         const isFiltered =
           filterState.selectedValues &&
           !filterState.selectedValues.includes(name);
         return {
           name: 'outlier',
           type: 'scatter',
-          data: outlierDatum.map(val => [name, val]),
+          data: outlierDatum.map(val => [
+            name,
+            val,
+            lowerBound,
+            upperBound,
+            whiskerMethod,
+          ]),
           tooltip: {
             ...getDefaultTooltip(refs),
-            formatter: (param: { data: [string, number] }) => {
-              const [outlierName, stats] = param.data;
+            formatter: (param: {
+              data: [
+                string,
+                number,
+                number | undefined,
+                number | undefined,
+                string,
+              ];
+            }) => {
+              const [outlierName, stats, lb, ub, method] = param.data;
               const headline = groupbyLabels.length
                 ? `<p><strong>${sanitizeHtml(outlierName)}</strong></p>`
                 : '';
-              return `${headline}${numberFormatter(stats)}`;
+              const boundInfo =
+                lb !== undefined && ub !== undefined
+                  ? `<br/>Threshold: ${numberFormatter(lb)} – ${numberFormatter(ub)}`
+                  : '';
+              return `${headline}Outlier (${sanitizeHtml(method)}): ${numberFormatter(stats)}${boundInfo}`;
             },
           },
           itemStyle: {
@@ -235,6 +262,7 @@ export default function transformProps(
           if (value[8].length > 0) {
             stats.push(`# Outliers: ${value[8].length}`);
           }
+          stats.push(`Method: ${sanitizeHtml(String(whiskerOptions))}`);
           return headline + stats.join('<br/>');
         },
       },

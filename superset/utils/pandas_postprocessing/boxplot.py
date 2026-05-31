@@ -24,6 +24,35 @@ from superset.exceptions import InvalidPostProcessingError
 from superset.utils.core import PostProcessingBoxplotWhiskerType
 from superset.utils.pandas_postprocessing.aggregate import aggregate
 
+AI_TRANSPARENCY_METADATA: dict[str, dict[str, str]] = {
+    PostProcessingBoxplotWhiskerType.TUKEY: {
+        "method": "Tukey IQR",
+        "description": (
+            "Outliers are points beyond Q1 − 1.5×IQR and Q3 + 1.5×IQR, "
+            "where IQR = Q3 − Q1. Assumes roughly normal distribution; "
+            "may over-flag in skewed or small-sample data."
+        ),
+        "threshold_formula": "Q1 − 1.5×IQR / Q3 + 1.5×IQR",
+    },
+    PostProcessingBoxplotWhiskerType.PERCENTILE: {
+        "method": "Percentile",
+        "description": (
+            "Whisker bounds are set at user-specified percentiles. "
+            "Points outside these bounds are classified as outliers. "
+            "Sensitive to sample size and distribution shape."
+        ),
+        "threshold_formula": "lower percentile / upper percentile",
+    },
+    PostProcessingBoxplotWhiskerType.MINMAX: {
+        "method": "Min/Max",
+        "description": (
+            "Whiskers extend to the dataset minimum and maximum. "
+            "No outlier detection is performed."
+        ),
+        "threshold_formula": "dataset min / dataset max",
+    },
+}
+
 
 def boxplot(  # noqa: C901
     df: DataFrame,
@@ -129,4 +158,29 @@ def boxplot(  # noqa: C901
         if df.dtypes[column] == np.object_:
             df[column] = to_numeric(df[column], errors="coerce")
 
-    return aggregate(df, groupby=groupby, aggregates=aggregates)
+    result = aggregate(df, groupby=groupby, aggregates=aggregates)
+
+    metadata = AI_TRANSPARENCY_METADATA.get(
+        whisker_type,
+        AI_TRANSPARENCY_METADATA[PostProcessingBoxplotWhiskerType.TUKEY],
+    )
+    for metric in metrics:
+        result[f"{metric}__whisker_method"] = metadata["method"]
+        result[f"{metric}__whisker_description"] = metadata["description"]
+
+        q1_col = f"{metric}__q1"
+        q3_col = f"{metric}__q3"
+        min_col = f"{metric}__min"
+        max_col = f"{metric}__max"
+        if whisker_type == PostProcessingBoxplotWhiskerType.TUKEY:
+            iqr = result[q3_col] - result[q1_col]
+            result[f"{metric}__lower_bound"] = result[q1_col] - 1.5 * iqr
+            result[f"{metric}__upper_bound"] = result[q3_col] + 1.5 * iqr
+        elif whisker_type == PostProcessingBoxplotWhiskerType.PERCENTILE:
+            result[f"{metric}__lower_bound"] = result[min_col]
+            result[f"{metric}__upper_bound"] = result[max_col]
+        else:
+            result[f"{metric}__lower_bound"] = result[min_col]
+            result[f"{metric}__upper_bound"] = result[max_col]
+
+    return result
