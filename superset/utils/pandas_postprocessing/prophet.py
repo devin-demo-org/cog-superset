@@ -15,7 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 import logging
-from typing import Optional, Union
+from datetime import datetime
+from importlib.metadata import version as package_version
+from typing import Any, Optional, Union
 
 import pandas as pd
 from flask_babel import gettext as _
@@ -38,6 +40,49 @@ def _prophet_parse_seasonality(
         return int(input_value)
     except ValueError:
         return input_value
+
+
+def _get_prophet_version() -> str:
+    try:
+        return package_version("prophet")
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+def _build_ai_transparency_metadata(
+    confidence_interval: float,
+    data_columns: list[str],
+    periods: int,
+    freq: str,
+    yearly_seasonality: Union[bool, str, int],
+    weekly_seasonality: Union[bool, str, int],
+    daily_seasonality: Union[bool, str, int],
+) -> dict[str, Any]:
+    """
+    Build EU AI Act Art.13 transparency metadata for Prophet forecasts.
+    """
+    return {
+        "ai_generated": True,
+        "model_name": "Prophet",
+        "model_version": _get_prophet_version(),
+        "confidence_interval": confidence_interval,
+        "forecast_periods": periods,
+        "frequency": freq,
+        "data_sources": data_columns,
+        "seasonality_config": {
+            "yearly": yearly_seasonality,
+            "weekly": weekly_seasonality,
+            "daily": daily_seasonality,
+        },
+        "limitations": [
+            "Prophet assumes additive or multiplicative trend and seasonality.",
+            "Forecasts degrade in accuracy further from training data.",
+            "Predictions assume historical patterns continue unchanged.",
+            "Anomalies and structural breaks may not be captured.",
+        ],
+        "generated_at": datetime.utcnow().isoformat(),
+        "regulation": "EU AI Act Art.13",
+    }
 
 
 def _prophet_fit_and_predict(  # pylint: disable=too-many-arguments
@@ -167,4 +212,20 @@ def prophet(  # pylint: disable=too-many-arguments
             for new_column in new_columns:
                 target_df = target_df.assign(**{new_column: fit_df[new_column]})
     target_df.reset_index(level=0, inplace=True)
-    return target_df.rename(columns={"ds": index})
+    result_df = target_df.rename(columns={"ds": index})
+
+    data_columns = [
+        col
+        for col in df.columns
+        if col != index and pd.to_numeric(df[col], errors="coerce").notnull().all()
+    ]
+    result_df.attrs["ai_transparency"] = _build_ai_transparency_metadata(
+        confidence_interval=confidence_interval,
+        data_columns=data_columns,
+        periods=periods,
+        freq=freq,
+        yearly_seasonality=_prophet_parse_seasonality(yearly_seasonality),
+        weekly_seasonality=_prophet_parse_seasonality(weekly_seasonality),
+        daily_seasonality=_prophet_parse_seasonality(daily_seasonality),
+    )
+    return result_df

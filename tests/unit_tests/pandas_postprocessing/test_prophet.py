@@ -23,6 +23,7 @@ import pytest
 from superset.exceptions import InvalidPostProcessingError
 from superset.utils.core import DTTM_ALIAS
 from superset.utils.pandas_postprocessing import prophet
+from superset.utils.pandas_postprocessing.prophet import _build_ai_transparency_metadata
 from tests.unit_tests.fixtures.dataframes import prophet_df
 
 
@@ -301,3 +302,100 @@ def test_prophet_does_not_clamp_yhat_below_zero_for_negative_actuals():
     forecast_periods = 2
     forecast_yhat = result["balance__yhat"].iloc[-forecast_periods:]
     assert (forecast_yhat < 0).any()
+
+
+def test_prophet_ai_transparency_metadata():
+    """
+    EU AI Act Art.13: Prophet forecasts must carry transparency metadata
+    indicating they are AI-generated, disclosing the model, confidence
+    interval, data sources, and limitations.
+    """
+    if find_spec("prophet") is None:
+        pytest.skip("prophet not installed")
+
+    df = prophet(
+        df=prophet_df,
+        time_grain="P1M",
+        periods=3,
+        confidence_interval=0.9,
+    )
+
+    assert "ai_transparency" in df.attrs
+    meta = df.attrs["ai_transparency"]
+
+    assert meta["ai_generated"] is True
+    assert meta["model_name"] == "Prophet"
+    assert isinstance(meta["model_version"], str)
+    assert meta["confidence_interval"] == 0.9
+    assert meta["forecast_periods"] == 3
+    assert meta["frequency"] == "MS"
+    assert sorted(meta["data_sources"]) == ["a", "b"]
+    assert meta["regulation"] == "EU AI Act Art.13"
+
+    assert isinstance(meta["seasonality_config"], dict)
+    for key in ("yearly", "weekly", "daily"):
+        assert key in meta["seasonality_config"]
+
+    assert isinstance(meta["limitations"], list)
+    assert len(meta["limitations"]) > 0
+
+    assert "generated_at" in meta
+
+
+def test_prophet_ai_transparency_metadata_custom_seasonality():
+    """
+    Verify that custom seasonality parameters are reflected in the
+    transparency metadata.
+    """
+    if find_spec("prophet") is None:
+        pytest.skip("prophet not installed")
+
+    df = prophet(
+        df=prophet_df,
+        time_grain="P1M",
+        periods=2,
+        confidence_interval=0.8,
+        yearly_seasonality=10,
+        weekly_seasonality=False,
+        daily_seasonality=True,
+    )
+
+    meta = df.attrs["ai_transparency"]
+    assert meta["confidence_interval"] == 0.8
+    assert meta["forecast_periods"] == 2
+    assert meta["seasonality_config"]["yearly"] == 10
+    assert meta["seasonality_config"]["weekly"] is False
+    assert meta["seasonality_config"]["daily"] is True
+
+
+def test_build_ai_transparency_metadata_structure():
+    """
+    Verify _build_ai_transparency_metadata returns all required EU AI Act
+    Art.13 fields without requiring the Prophet library.
+    """
+    meta = _build_ai_transparency_metadata(
+        confidence_interval=0.95,
+        data_columns=["revenue", "cost"],
+        periods=5,
+        freq="MS",
+        yearly_seasonality="auto",
+        weekly_seasonality="auto",
+        daily_seasonality="auto",
+    )
+
+    assert meta["ai_generated"] is True
+    assert meta["model_name"] == "Prophet"
+    assert isinstance(meta["model_version"], str)
+    assert meta["confidence_interval"] == 0.95
+    assert meta["forecast_periods"] == 5
+    assert meta["frequency"] == "MS"
+    assert meta["data_sources"] == ["revenue", "cost"]
+    assert meta["regulation"] == "EU AI Act Art.13"
+    assert meta["seasonality_config"] == {
+        "yearly": "auto",
+        "weekly": "auto",
+        "daily": "auto",
+    }
+    assert isinstance(meta["limitations"], list)
+    assert len(meta["limitations"]) > 0
+    assert "generated_at" in meta
