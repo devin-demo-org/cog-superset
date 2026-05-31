@@ -55,6 +55,7 @@ class DashboardModelView(DashboardMixin, SupersetModelView, DeleteMixin):  # pyl
 
     @has_access
     @expose("/list/")
+    @event_logger.log_this
     def list(self) -> FlaskResponse:
         return super().render_app_template()
 
