@@ -526,7 +526,7 @@ class SavedQuery(
         if len(parts) != 2:
             return "***"
         local, domain = parts
-        if len(local) <= 1:
+        if not local:
             masked_local = "*"
         else:
             masked_local = local[0] + "***"
