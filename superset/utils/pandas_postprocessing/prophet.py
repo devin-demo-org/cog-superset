@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from importlib.metadata import version as package_version
 from typing import Any, Optional, Union
 
@@ -43,6 +43,7 @@ def _prophet_parse_seasonality(
 
 
 def _get_prophet_version() -> str:
+    """Return the installed prophet package version, or 'unknown' if unavailable."""
     try:
         return package_version("prophet")
     except Exception:  # noqa: BLE001
@@ -80,7 +81,7 @@ def _build_ai_transparency_metadata(
             "Predictions assume historical patterns continue unchanged.",
             "Anomalies and structural breaks may not be captured.",
         ],
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "regulation": "EU AI Act Art.13",
     }
 
