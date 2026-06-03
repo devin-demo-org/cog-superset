@@ -258,6 +258,34 @@ def test_prophet_uncertainty_lower_bound_can_be_negative_for_negative_series():
     )
 
 
+def test_prophet_ai_transparency_metadata():
+    """
+    EU AI Act Art.13 compliance: verify that Prophet forecasting output
+    includes AI transparency metadata (model name, confidence interval,
+    data sources, and limitations).
+    """
+    if find_spec("prophet") is None:
+        pytest.skip("prophet not installed")
+
+    df = prophet(df=prophet_df, time_grain="P1M", periods=3, confidence_interval=0.9)
+
+    # Metadata dict must exist
+    assert "ai_transparency" in df.attrs
+    metadata = df.attrs["ai_transparency"]
+
+    # Required fields per EU AI Act Art.13
+    assert metadata["ai_generated"] is True
+    assert metadata["model_name"] == "Prophet"
+    assert "model_description" in metadata
+    assert len(metadata["model_description"]) > 0
+    assert metadata["confidence_interval"] == 0.9
+    assert metadata["forecast_periods"] == 3
+    assert metadata["time_grain"] == "P1M"
+    assert set(metadata["data_sources"]) == {"a", "b"}
+    assert "limitations" in metadata
+    assert len(metadata["limitations"]) > 0
+
+
 def test_prophet_does_not_clamp_yhat_below_zero_for_negative_actuals():
     """
     Companion to the lower-bound test above: the central forecast

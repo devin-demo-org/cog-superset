@@ -167,4 +167,31 @@ def prophet(  # pylint: disable=too-many-arguments
             for new_column in new_columns:
                 target_df = target_df.assign(**{new_column: fit_df[new_column]})
     target_df.reset_index(level=0, inplace=True)
-    return target_df.rename(columns={"ds": index})
+    result_df = target_df.rename(columns={"ds": index})
+
+    # EU AI Act Art.13 — attach transparency metadata to AI-generated output
+    series_columns = [
+        col
+        for col in df.columns
+        if col != index and pd.to_numeric(df[col], errors="coerce").notnull().all()
+    ]
+    result_df.attrs["ai_transparency"] = {
+        "ai_generated": True,
+        "model_name": "Prophet",
+        "model_description": (
+            "Prophet is an additive regression model for time-series forecasting "
+            "developed by Meta. It decomposes signals into trend, seasonality, and "
+            "holiday components."
+        ),
+        "confidence_interval": confidence_interval,
+        "forecast_periods": periods,
+        "time_grain": time_grain,
+        "data_sources": series_columns,
+        "limitations": (
+            "Prophet assumes historical patterns continue into the future. "
+            "It may underperform on data with regime changes, external shocks, "
+            "or non-linear dynamics not captured by its additive decomposition."
+        ),
+    }
+
+    return result_df
