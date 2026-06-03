@@ -153,6 +153,20 @@ def _log_audit_event(action: str, payload: dict[str, Any]) -> None:
         logger.warning("Failed to log audit event: %s", action, exc_info=True)
 
 
+def _anonymize_user_logs(user_id: int) -> None:
+    """Anonymize audit-log rows for a deleted user (GDPR Art. 17)."""
+    from superset.commands.logs.anonymize import (  # pylint: disable=import-outside-toplevel
+        LogAnonymizeCommand,
+    )
+
+    try:
+        LogAnonymizeCommand(user_id).run()
+    except Exception:  # pylint: disable=broad-except
+        logger.warning(
+            "Failed to anonymize logs for user_id=%s", user_id, exc_info=True
+        )
+
+
 class SupersetRoleApi(RoleApi):
     """
     Overriding the RoleApi to be able to delete roles with permissions
@@ -254,6 +268,7 @@ class SupersetUserApi(UserApi):
                 "target_user_id": item.id,
             },
         )
+        _anonymize_user_logs(item.id)
 
 
 class SupersetGroupApi(GroupApi):

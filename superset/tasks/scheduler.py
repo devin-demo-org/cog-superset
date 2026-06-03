@@ -29,6 +29,7 @@ from superset_core.tasks.types import TaskStatus
 
 from superset import is_feature_enabled
 from superset.commands.exceptions import CommandException
+from superset.commands.logs.anonymize import LogAnonymizeCommand
 from superset.commands.logs.prune import LogPruneCommand
 from superset.commands.report.exceptions import ReportScheduleUnexpectedError
 from superset.commands.report.execute import AsyncExecuteReportScheduleCommand
@@ -208,6 +209,22 @@ def prune_logs(
         LogPruneCommand(retention_period_days, max_rows_per_run).run()
     except CommandException as ex:
         logger.exception("An error occurred while pruning logs: %s", ex)
+
+
+@celery_app.task(name="anonymize_user_audit_logs", bind=True)
+def anonymize_user_audit_logs(self: Task, user_id: int, **kwargs: Any) -> None:
+    """Anonymize audit-log rows for a specific user (GDPR Art. 17)."""
+    stats_logger: BaseStatsLogger = current_app.config["STATS_LOGGER"]
+    stats_logger.incr("anonymize_user_audit_logs")
+
+    try:
+        LogAnonymizeCommand(user_id).run()
+    except CommandException as ex:
+        logger.exception(
+            "An error occurred while anonymizing logs for user_id=%s: %s",
+            user_id,
+            ex,
+        )
 
 
 @celery_app.task(name="prune_tasks", bind=True)

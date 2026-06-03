@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, patch
 from flask_appbuilder.security.sqla.models import Group, Role, User
 
 from superset.security.manager import (
+    _anonymize_user_logs,
     _log_audit_event,
     SupersetGroupApi,
     SupersetRoleApi,
@@ -274,3 +275,42 @@ def test_on_user_logout_logs_event(mock_log: MagicMock) -> None:
     mock_log.assert_called_once_with(
         "UserLoggedOut", {"username": "testuser", "user_id": 7}
     )
+
+
+# --- GDPR: Log anonymization on user deletion ---
+
+
+@patch("superset.security.manager._anonymize_user_logs")
+@patch("superset.security.manager._log_audit_event")
+def test_user_post_delete_triggers_log_anonymization(
+    mock_log: MagicMock, mock_anonymize: MagicMock
+) -> None:
+    """GDPR Art.17: post_delete must anonymize the deleted user's audit logs."""
+    api = SupersetUserApi.__new__(SupersetUserApi)
+    user = MagicMock(spec=User)
+    user.username = "deleted_user"
+    user.id = 42
+
+    api.post_delete(user)
+
+    mock_log.assert_called_once()
+    mock_anonymize.assert_called_once_with(42)
+
+
+@patch("superset.security.manager.LogAnonymizeCommand")
+def test_anonymize_user_logs_delegates_to_command(
+    mock_cmd_cls: MagicMock,
+) -> None:
+    """_anonymize_user_logs instantiates and runs LogAnonymizeCommand."""
+    _anonymize_user_logs(42)
+    mock_cmd_cls.assert_called_once_with(42)
+    mock_cmd_cls.return_value.run.assert_called_once()
+
+
+@patch("superset.security.manager.LogAnonymizeCommand")
+def test_anonymize_user_logs_swallows_exceptions(
+    mock_cmd_cls: MagicMock,
+) -> None:
+    """_anonymize_user_logs does not raise on command errors."""
+    mock_cmd_cls.return_value.run.side_effect = RuntimeError("boom")
+    _anonymize_user_logs(42)

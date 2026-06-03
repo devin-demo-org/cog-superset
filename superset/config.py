@@ -1311,6 +1311,14 @@ BACKUP_COUNT = 30
 #     pass
 QUERY_LOGGER = None
 
+# ---------------------------------------------------
+# Audit Log Retention (GDPR)
+# ---------------------------------------------------
+# Number of days to retain rows in the ``logs`` table.  The ``prune_logs``
+# Celery beat task uses this value when it is enabled in the beat schedule.
+# Set to 0 to disable automatic pruning.
+AUDIT_LOG_RETENTION_DAYS = 30
+
 # Set this API key to enable Mapbox visualizations
 MAPBOX_API_KEY = os.environ.get("MAPBOX_API_KEY", "")
 
@@ -1410,12 +1418,14 @@ class CeleryConfig:  # pylint: disable=too-few-public-methods
         #     "schedule": crontab(minute=0, hour=0, day_of_month=1),
         #     "kwargs": {"retention_period_days": 180},
         # },
-        # Uncomment to enable pruning of the logs table
-        # "prune_logs": {
-        #     "task": "prune_logs",
-        #     "schedule": crontab(minute="*", hour="*"),
-        #     "kwargs": {"retention_period_days": 180, "max_rows_per_run": 10000},
-        # },
+        "prune_logs": {
+            "task": "prune_logs",
+            "schedule": crontab(minute=0, hour=0),
+            "kwargs": {
+                "retention_period_days": AUDIT_LOG_RETENTION_DAYS,
+                "max_rows_per_run": 10000,
+            },
+        },
         # Uncomment to enable pruning of the tasks table
         # "prune_tasks": {
         #     "task": "prune_tasks",
