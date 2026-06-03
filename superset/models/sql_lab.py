@@ -511,7 +511,7 @@ class SavedQuery(
 
     @property
     def pop_tab_link(self) -> Markup:
-        return Markup(
+        return Markup(  # noqa: S704
             f"""
             <a href="/sqllab?savedQueryId={self.id}">
                 <i class="fa fa-link"></i>
@@ -521,7 +521,11 @@ class SavedQuery(
 
     @property
     def user_email(self) -> str:
-        return self.user.email
+        email: str = self.user.email
+        local, _, domain = email.partition("@")
+        if domain:
+            return f"{local[0]}***@{domain}"
+        return "***"
 
     @property
     def sqlalchemy_uri(self) -> URL:
