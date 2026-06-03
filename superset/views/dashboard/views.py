@@ -17,7 +17,7 @@
 import builtins
 from typing import Callable, Union
 
-from flask import g, redirect, Response, url_for
+from flask import g, redirect, request, Response, url_for
 from flask_appbuilder import expose
 from flask_appbuilder.actions import action
 from flask_appbuilder.models.sqla.interface import SQLAInterface
@@ -29,6 +29,7 @@ from superset import db, event_logger, is_feature_enabled
 from superset.constants import MODEL_VIEW_RW_METHOD_PERMISSION_MAP, RouteMethod
 from superset.models.dashboard import Dashboard as DashboardModel
 from superset.superset_typing import FlaskResponse
+from superset.utils.core import get_user_id
 from superset.views.base import (
     BaseSupersetView,
     common_bootstrap_payload,
@@ -65,6 +66,25 @@ class DashboardModelView(DashboardMixin, SupersetModelView, DeleteMixin):  # pyl
     ) -> FlaskResponse:
         if not isinstance(items, list):
             items = [items]
+
+        event_logger.log(
+            user_id=get_user_id(),
+            action="DashboardExport",
+            dashboard_id=None,
+            duration_ms=None,
+            slice_id=None,
+            referrer=request.referrer,
+            curated_payload=None,
+            curated_form_data=None,
+            records=[
+                {
+                    "dashboard_ids": [item.id for item in items],
+                    "dashboard_count": len(items),
+                    "session_id": request.cookies.get("session", ""),
+                }
+            ],
+        )
+
         return redirect(url_for("DashboardModelView.download_dashboards", id=items))
 
 
