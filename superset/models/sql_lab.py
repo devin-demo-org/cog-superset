@@ -524,7 +524,7 @@ class SavedQuery(
         email: str = self.user.email
         local, _, domain = email.partition("@")
         if domain:
-            return f"{local[0]}***@{domain}"
+            return f"{local[0]}***@{domain}" if local else f"***@{domain}"
         return "***"
 
     @property

@@ -141,6 +141,8 @@ def test_sql_tables_mixin_invalid_sql_returns_empty_list(
         ("alice@example.com", "a***@example.com"),
         ("bob.smith@corp.io", "b***@corp.io"),
         ("x@y.com", "x***@y.com"),
+        ("@domain.com", "***@domain.com"),
+        ("noatsign", "***"),
     ],
 )
 def test_saved_query_user_email_is_masked(
