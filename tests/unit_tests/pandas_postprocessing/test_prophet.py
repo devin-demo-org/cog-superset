@@ -258,6 +258,84 @@ def test_prophet_uncertainty_lower_bound_can_be_negative_for_negative_series():
     )
 
 
+def test_prophet_ai_transparency_metadata():
+    """
+    EU AI Act Art.13 requires AI-generated outputs to carry transparency
+    metadata.  Verify that ``prophet()`` attaches a well-formed
+    ``ai_transparency`` dict to ``DataFrame.attrs``.
+    """
+    if find_spec("prophet") is None:
+        pytest.skip("prophet not installed")
+
+    df = prophet(
+        df=prophet_df,
+        time_grain="P1M",
+        periods=3,
+        confidence_interval=0.9,
+    )
+
+    meta = df.attrs.get("ai_transparency")
+    assert meta is not None, "ai_transparency metadata missing from DataFrame.attrs"
+
+    # AI-generated label (Art.13 — clear labelling)
+    assert meta["ai_generated"] is True
+    assert meta["model_name"] == "Prophet"
+    assert isinstance(meta["model_description"], str)
+    assert len(meta["model_description"]) > 0
+
+    # Confidence level disclosure
+    assert meta["confidence_interval"] == 0.9
+
+    # Forecast parameters
+    assert meta["forecast_periods"] == 3
+    assert meta["time_grain"] == "P1M"
+
+    # Data sources disclosure
+    assert sorted(meta["data_sources"]) == ["a", "b"]
+
+    # Seasonality parameters
+    assert "seasonality_params" in meta
+    for key in ("yearly", "weekly", "daily"):
+        assert key in meta["seasonality_params"]
+
+    # Model limitations disclosure
+    assert isinstance(meta["limitations"], list)
+    assert len(meta["limitations"]) > 0
+    for limitation in meta["limitations"]:
+        assert isinstance(limitation, str)
+        assert len(limitation) > 0
+
+    # Timestamp
+    assert "generated_at" in meta
+    assert meta["generated_at"].endswith("Z")
+
+
+def test_prophet_ai_transparency_metadata_custom_seasonality():
+    """
+    Verify transparency metadata correctly reflects explicit seasonality
+    overrides rather than always reporting defaults.
+    """
+    if find_spec("prophet") is None:
+        pytest.skip("prophet not installed")
+
+    df = prophet(
+        df=prophet_df,
+        time_grain="P1M",
+        periods=2,
+        confidence_interval=0.8,
+        yearly_seasonality=True,
+        weekly_seasonality=False,
+        daily_seasonality=5,
+    )
+
+    meta = df.attrs["ai_transparency"]
+    assert meta["confidence_interval"] == 0.8
+    assert meta["forecast_periods"] == 2
+    assert meta["seasonality_params"]["yearly"] is True
+    assert meta["seasonality_params"]["weekly"] is False
+    assert meta["seasonality_params"]["daily"] == 5
+
+
 def test_prophet_does_not_clamp_yhat_below_zero_for_negative_actuals():
     """
     Companion to the lower-bound test above: the central forecast

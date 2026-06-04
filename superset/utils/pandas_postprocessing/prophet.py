@@ -15,7 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 import logging
-from typing import Optional, Union
+from datetime import datetime
+from typing import Any, Optional, Union
 
 import pandas as pd
 from flask_babel import gettext as _
@@ -167,4 +168,65 @@ def prophet(  # pylint: disable=too-many-arguments
             for new_column in new_columns:
                 target_df = target_df.assign(**{new_column: fit_df[new_column]})
     target_df.reset_index(level=0, inplace=True)
-    return target_df.rename(columns={"ds": index})
+    result_df = target_df.rename(columns={"ds": index})
+    result_df.attrs["ai_transparency"] = _build_ai_transparency_metadata(
+        confidence_interval=confidence_interval,
+        periods=periods,
+        time_grain=time_grain,
+        series_columns=[
+            col
+            for col in df.columns
+            if col != index and pd.to_numeric(df[col], errors="coerce").notnull().all()
+        ],
+        yearly_seasonality=yearly_seasonality,
+        weekly_seasonality=weekly_seasonality,
+        daily_seasonality=daily_seasonality,
+    )
+    return result_df
+
+
+def _build_ai_transparency_metadata(
+    confidence_interval: float,
+    periods: int,
+    time_grain: str,
+    series_columns: list[str],
+    yearly_seasonality: Optional[Union[bool, int]],
+    weekly_seasonality: Optional[Union[bool, int]],
+    daily_seasonality: Optional[Union[bool, int]],
+) -> dict[str, Any]:
+    """
+    Build EU AI Act Art.13 transparency metadata for Prophet forecasts.
+
+    Returns a dict attached to ``DataFrame.attrs["ai_transparency"]``
+    so downstream consumers (API serializers, chart renderers) can
+    surface the required disclosures to end users.
+    """
+    return {
+        "ai_generated": True,
+        "model_name": "Prophet",
+        "model_description": (
+            "Prophet is an additive regression model using piecewise linear "
+            "or logistic growth curves with automatic changepoint detection, "
+            "Fourier-based seasonality, and user-specified holiday effects."
+        ),
+        "confidence_interval": confidence_interval,
+        "forecast_periods": periods,
+        "time_grain": time_grain,
+        "data_sources": series_columns,
+        "seasonality_params": {
+            "yearly": _prophet_parse_seasonality(yearly_seasonality),
+            "weekly": _prophet_parse_seasonality(weekly_seasonality),
+            "daily": _prophet_parse_seasonality(daily_seasonality),
+        },
+        "limitations": [
+            "Prophet assumes additive or multiplicative seasonality; "
+            "non-standard seasonal patterns may reduce accuracy.",
+            "Forecasts degrade for horizons significantly longer than the "
+            "training history.",
+            "The model does not account for external regressors unless "
+            "explicitly configured.",
+            "Confidence intervals represent statistical uncertainty only "
+            "and do not capture model mis-specification risk.",
+        ],
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+    }
