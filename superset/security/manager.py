@@ -231,7 +231,6 @@ class SupersetUserApi(UserApi):
         _log_audit_event(
             "UserCreated",
             {
-                "target_username": item.username,
                 "target_user_id": item.id,
             },
         )
@@ -240,7 +239,6 @@ class SupersetUserApi(UserApi):
         _log_audit_event(
             "UserUpdated",
             {
-                "target_username": item.username,
                 "target_user_id": item.id,
                 "active": item.active,
             },
@@ -250,7 +248,6 @@ class SupersetUserApi(UserApi):
         _log_audit_event(
             "UserDeleted",
             {
-                "target_username": item.username,
                 "target_user_id": item.id,
             },
         )

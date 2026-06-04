@@ -119,7 +119,6 @@ def test_user_api_post_add_logs_event(mock_log: MagicMock) -> None:
     mock_log.assert_called_once_with(
         "UserCreated",
         {
-            "target_username": "testuser",
             "target_user_id": 7,
         },
     )
@@ -138,7 +137,6 @@ def test_user_api_post_update_logs_event(mock_log: MagicMock) -> None:
     mock_log.assert_called_once_with(
         "UserUpdated",
         {
-            "target_username": "testuser",
             "target_user_id": 7,
             "active": True,
         },
@@ -155,7 +153,7 @@ def test_user_api_post_delete_logs_event(mock_log: MagicMock) -> None:
     api.post_delete(user)
     mock_log.assert_called_once_with(
         "UserDeleted",
-        {"target_username": "testuser", "target_user_id": 7},
+        {"target_user_id": 7},
     )
 
 
@@ -184,6 +182,45 @@ def test_user_api_post_update_excludes_email(mock_log: MagicMock) -> None:
     api.post_update(user)
     payload = mock_log.call_args[0][1]
     assert "email" not in payload
+
+
+@patch("superset.security.manager._log_audit_event")
+def test_user_api_post_add_excludes_username(mock_log: MagicMock) -> None:
+    """GDPR Art.5: post_add must not include username in the audit payload."""
+    api = SupersetUserApi.__new__(SupersetUserApi)
+    user = MagicMock(spec=User)
+    user.username = "testuser"
+    user.id = 7
+    user.email = "test@example.com"
+    api.post_add(user)
+    payload = mock_log.call_args[0][1]
+    assert "target_username" not in payload
+
+
+@patch("superset.security.manager._log_audit_event")
+def test_user_api_post_update_excludes_username(mock_log: MagicMock) -> None:
+    """GDPR Art.5: post_update must not include username in the audit payload."""
+    api = SupersetUserApi.__new__(SupersetUserApi)
+    user = MagicMock(spec=User)
+    user.username = "testuser"
+    user.id = 7
+    user.email = "test@example.com"
+    user.active = True
+    api.post_update(user)
+    payload = mock_log.call_args[0][1]
+    assert "target_username" not in payload
+
+
+@patch("superset.security.manager._log_audit_event")
+def test_user_api_post_delete_excludes_username(mock_log: MagicMock) -> None:
+    """GDPR Art.5: post_delete must not include username in the audit payload."""
+    api = SupersetUserApi.__new__(SupersetUserApi)
+    user = MagicMock(spec=User)
+    user.username = "testuser"
+    user.id = 7
+    api.post_delete(user)
+    payload = mock_log.call_args[0][1]
+    assert "target_username" not in payload
 
 
 # --- Group CRUD ---
