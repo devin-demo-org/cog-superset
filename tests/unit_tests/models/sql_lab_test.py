@@ -33,6 +33,34 @@ from superset.models.sql_lab import Query, SavedQuery
 
 
 @pytest.mark.parametrize(
+    ("email", "expected"),
+    [
+        ("alice@example.com", "a***@example.com"),
+        ("b@domain.org", "b***@domain.org"),
+        ("longname@company.co", "l***@company.co"),
+        ("noatsign", "***"),
+    ],
+)
+def test_saved_query_user_email_is_masked(email: str, expected: str) -> None:
+    """GDPR Art.5: user_email must mask the local part of the address."""
+    query = SavedQuery.__new__(SavedQuery)
+    user = MagicMock()
+    user.email = email
+    query.user = user
+    assert query.user_email == expected
+
+
+def test_saved_query_user_email_hides_full_address() -> None:
+    """GDPR Art.5: user_email must never return the raw email address."""
+    query = SavedQuery.__new__(SavedQuery)
+    user = MagicMock()
+    user.email = "secret@example.com"
+    query.user = user
+    assert query.user_email != "secret@example.com"
+    assert "secret" not in query.user_email
+
+
+@pytest.mark.parametrize(
     "klass",
     [
         Query,
