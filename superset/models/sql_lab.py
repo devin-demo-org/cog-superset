@@ -511,7 +511,7 @@ class SavedQuery(
 
     @property
     def pop_tab_link(self) -> Markup:
-        return Markup(
+        return Markup(  # noqa: S704
             f"""
             <a href="/sqllab?savedQueryId={self.id}">
                 <i class="fa fa-link"></i>
@@ -519,9 +519,19 @@ class SavedQuery(
         """
         )
 
+    @staticmethod
+    def _mask_email(email: str) -> str:
+        """Mask an email address to comply with GDPR data minimisation (Art.5)."""
+        parts = email.split("@")
+        if len(parts) != 2:
+            return "***"
+        local = parts[0]
+        masked_local = local[0] + "***" if local else "***"
+        return f"{masked_local}@{parts[1]}"
+
     @property
     def user_email(self) -> str:
-        return self.user.email
+        return self._mask_email(self.user.email)
 
     @property
     def sqlalchemy_uri(self) -> URL:
