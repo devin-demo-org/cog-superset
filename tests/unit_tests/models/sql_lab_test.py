@@ -133,3 +133,33 @@ def test_sql_tables_mixin_invalid_sql_returns_empty_list(
         else klass(database=MagicMock())
     )
     assert instance.sql_tables == []
+
+
+@pytest.mark.parametrize(
+    ("raw_email", "expected"),
+    [
+        ("alice@example.com", "a***@example.com"),
+        ("b@corp.co", "b***@corp.co"),
+        ("@edge.case", "***@edge.case"),
+    ],
+)
+def test_saved_query_user_email_masks_pii(
+    raw_email: str,
+    expected: str,
+) -> None:
+    """GDPR Art.5/Art.25: user_email must mask the local part of the address."""
+    user = MagicMock()
+    user.email = raw_email
+    query = SavedQuery.__new__(SavedQuery)
+    query.user = user
+    assert query.user_email == expected
+    assert raw_email not in query.user_email
+
+
+def test_saved_query_user_email_no_at_sign() -> None:
+    """GDPR Art.5: user_email returns '***' when email has no '@'."""
+    user = MagicMock()
+    user.email = "invalid-email"
+    query = SavedQuery.__new__(SavedQuery)
+    query.user = user
+    assert query.user_email == "***"

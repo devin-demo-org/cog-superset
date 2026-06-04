@@ -521,7 +521,11 @@ class SavedQuery(
 
     @property
     def user_email(self) -> str:
-        return self.user.email
+        email: str = self.user.email
+        if "@" in email:
+            local, domain = email.split("@", 1)
+            return f"{local[0]}***@{domain}" if local else f"***@{domain}"
+        return "***"
 
     @property
     def sqlalchemy_uri(self) -> URL:
