@@ -59,12 +59,19 @@ class DashboardModelView(DashboardMixin, SupersetModelView, DeleteMixin):  # pyl
         return super().render_app_template()
 
     @action("mulexport", __("Export"), __("Export dashboards?"), "fa-database")
+    @event_logger.log_this_with_extra_payload
     def mulexport(
         self,
         items: Union["DashboardModelView", builtins.list["DashboardModelView"]],
+        add_extra_log_payload: Callable[..., None] = lambda **kwargs: None,
     ) -> FlaskResponse:
         if not isinstance(items, list):
             items = [items]
+        add_extra_log_payload(
+            action="dashboard_export",
+            dashboard_ids=[item.id for item in items],
+            dashboard_count=len(items),
+        )
         return redirect(url_for("DashboardModelView.download_dashboards", id=items))
 
 
